@@ -1,70 +1,51 @@
+import axios from 'axios'
 import { useUserStore } from '@/stores/user'
-// 这里也可以根据实际情况修改成线上接口地址
-const baseURL = 'http://localhost:8080/talent-api/'
+import { ElMessage } from 'element-plus'
+import router from '@/router'
 
-export const http = (options) => {
-  // 1. 返回 Promise 对象
-  return new Promise((resolve, reject) => {
-    uni.request({
-      ...options,
-      // 响应成功
-      success(res) {
-        // 状态码 2xx，参考 axios 的设计
-        if (res.statusCode >= 200 && res.statusCode < 300) {
-          if (res.data.code !== 0) {
-            // 根据后端错误信息轻提示
-            uni.showToast({
-              icon: 'error',
-              title: res.data.msg || '请求错误',
-            })
-          } else {
-            // 提取核心数据 res.data
-            resolve(res.data)
-          }
-        } else if (res.statusCode === 401) {
-          // 401错误  -> 清理用户信息，跳转到登录页
-          const userStore = useUserStore()
-          userStore.clearUserInfo()
-          uni.navigateTo({ url: '/pages/login/login' })
-          reject(res)
-        } else {
-          // 其他错误 -> 根据后端错误信息轻提示
-          uni.showToast({
-            icon: 'none',
-            title: res.data.msg || '请求错误',
-          })
-          reject(res)
-        }
-      },
-      // 响应失败
-      fail(err) {
-        uni.showToast({
-          icon: 'none',
-          title: '网络错误，换个网络试试',
-        })
-        reject(err)
-      },
-    })
-  })
-}
+const baseURL = import.meta.env.VITE_API_URL
 
-const httpInterceptor = {
-  invoke(options) {
-    if (!options.url.startsWith('http')) {
-      options.url = baseURL + options.url
-    }
-    options.timeout = 10000
-    options.header = {
-      ...options.header,
-    }
-    const token = uni.getStorageSync('token') || 'no-token'
+const instance = axios.create({
+  baseURL,
+  timeout: 10000,
+})
+
+;(instance.interceptors.request.use(
+  (config) => {
+    const userStore = useUserStore()
+    // 使用可选链操作符,以防 userInfo 为 null
+    const token = userStore.userInfo?.accessToken
     if (token) {
-      options.header.Authorization = token
+      config.headers.Authorization = `${token}`
     }
+    return config
   },
-}
+  (err) => Promise.reject(err),
+),
+  instance.interceptors.response.use(
+    (res) => {
+      // 统一返回 res.data
+      const responseData = res.data || {}
+      // 检查 code 是否存在且不为 0，如果 code 不存在，则视为成功
+      if (responseData.code !== undefined && responseData.code !== 0) {
+        ElMessage.error(responseData.msg || '服务异常')
+        // 如果有业务错误，则将 Promise 置为 rejected 状态
+        return Promise.reject(responseData)
+      }
+      // 如果没有业务错误，则直接返回数据
+      return responseData
+    },
+    (err) => {
+      if (err.response?.status === 401) {
+        const userStore = useUserStore()
+        userStore.clearUserInfo()
+        router.push('/login')
+      }
 
-// 拦截 request 请求
-uni.addInterceptor('request', httpInterceptor)
-// 拦截 uploadFile 文件上传
-uni.addInterceptor('uploadFile', httpInterceptor)
+      ElMessage.error(err.response?.data.msg || '服务异常')
+      return Promise.reject(err)
+    },
+  ))
+
+export default instance
+export { baseURL }
