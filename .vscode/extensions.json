@@ -1,0 +1,9 @@
+{
+  "recommendations": [
+    "Vue.volar",
+    "vue.Official", // vue3 语法支持
+    "editorconfig.editorconfig", // editorconfig
+    "dbaeumer.vscode-eslint", // eslint
+    "esbenp.prettier-vscode" // prettier
+  ]
+}
