@@ -7,7 +7,7 @@ const baseURL = import.meta.env.VITE_API_URL
 
 const instance = axios.create({
   baseURL,
-  timeout: 10000,
+  timeout: 60000,
 })
 
 ;(instance.interceptors.request.use(

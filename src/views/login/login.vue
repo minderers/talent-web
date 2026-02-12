@@ -175,6 +175,8 @@ const handleLogin = async () => {
     const res = await passwordLogin(form.userCode, form.password)
     // 将整个响应体存入 store，以确保 token 能被正确设置
     userStore.setUserInfo(res.data)
+    userStore.setToken(res.data.accesstoken)
+    // router.setLocalStorage('token', res.data.accesstoken)
     ElMessage.success('登录成功')
     router.push('/')
   } catch (error) {

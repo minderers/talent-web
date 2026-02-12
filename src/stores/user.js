@@ -1,31 +1,52 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { getUserInfo } from '../api/user'
 
-// 定义 Store
-export const useUserStore = defineStore(
-  'user',
-  () => {
-    // 登录用户信息
-    const userInfo = ref(null)
+export const useUserStore = defineStore('user', {
+  state: () => ({
+    userInfo: null,
+    token: '',
+  }),
 
-    // 保存登录用户信息
-    const setUserInfo = (val) => {
-      userInfo.value = val
-    }
+  actions: {
+    setUserInfo(info) {
+      this.userInfo = info
+    },
 
-    // 清除登录用户信息
-    const clearUserInfo = () => {
-      userInfo.value = null
-    }
+    setToken(newToken) {
+      this.token = newToken
+      localStorage.setItem('token', newToken)
+    },
 
-    // 记得 return
-    return {
-      userInfo,
-      setUserInfo,
-      clearUserInfo,
-    }
+    clearUserInfo() {
+      this.userInfo = null
+    },
+
+    clearToken() {
+      this.token = ''
+      localStorage.removeItem('token')
+      localStorage.removeItem('userId')
+    },
+
+    async getLoginUserInfo() {
+      try {
+        const res = await getUserInfo()
+        if (res.code === 0 && res.data) {
+          this.setUserInfo(res.data)
+        } else {
+          throw new Error(res.msg || '获取用户信息失败')
+        }
+      } catch (error) {
+        console.error('获取用户信息失败:', error)
+        this.clearUserInfo()
+        this.clearToken()
+        throw error
+      }
+    },
   },
-  {
-    unistorage: true, // 开启后，userStore 下的所有数据都将自动持久化
+
+  persist: {
+    key: 'user-store',
+    storage: localStorage,
+    paths: ['token', 'userInfo'], // 指定要持久化的字段
   },
-)
+})
