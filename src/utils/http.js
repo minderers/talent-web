@@ -14,7 +14,8 @@ const instance = axios.create({
   (config) => {
     const userStore = useUserStore()
     // 使用可选链操作符,以防 userInfo 为 null
-    const token = userStore.userInfo?.accessToken
+    const token =
+      userStore.userInfo?.accessToken || userStore.token || localStorage.getItem('token')
     if (token) {
       config.headers.Authorization = `${token}`
     }
