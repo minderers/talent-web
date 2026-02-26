@@ -24,7 +24,7 @@
     </div>
 
     <!-- 结果展示区域 -->
-    <div v-if="isAnalyzing" class="text-center py-10">
+    <div v-if="isAnalyzing && !analysisResult && !streamAiAnalysis" class="text-center py-10">
       <p class="text-lg text-slate-400">正在分析中，请稍候...</p>
     </div>
 
@@ -83,7 +83,7 @@
 
       <!-- AI 分析报告 -->
       <div
-        v-if="analysisResult.aiAnalysis"
+        v-if="streamAiAnalysis"
         class="bg-slate-800/80 backdrop-blur-xl border border-purple-400/20 rounded-2xl shadow-lg p-6"
       >
         <h3 class="text-2xl font-bold text-purple-400 mb-4">AI 技能缺口分析报告</h3>
@@ -95,7 +95,7 @@
 
 <script setup>
 import { ref, reactive, computed } from 'vue'
-import { getMajorAnalysis } from '@/api/analysis'
+import { getMajorAnalysis, getMajorStreamAnalysis } from '@/api/analysis'
 import { ElMessage } from 'element-plus'
 import { marked } from 'marked'
 
@@ -106,18 +106,37 @@ const analysisFilters = reactive({
 
 const isAnalyzing = ref(false)
 const analysisResult = ref(null)
+const streamAiAnalysis = ref('')
 
 const handleAnalysis = async () => {
   if (isAnalyzing.value) return
   isAnalyzing.value = true
   analysisResult.value = null
+  streamAiAnalysis.value = ''
+
   try {
     const params = {
       jobType: analysisFilters.jobType || undefined,
       education: analysisFilters.education || undefined,
     }
-    const res = await getMajorAnalysis(params)
-    analysisResult.value = res.data
+
+    // 并行启动两个请求
+    const analysisPromise = getMajorAnalysis(params)
+    const streamPromise = getMajorStreamAnalysis({
+      jobType: params.jobType,
+      onProgress: (textChunk) => {
+        if (textChunk) {
+          streamAiAnalysis.value += textChunk
+        }
+      },
+    })
+
+    // 等待非流式请求完成
+    const analysisRes = await analysisPromise
+    analysisResult.value = analysisRes.data
+
+    // 等待流式请求完成（虽然UI已经开始更新）
+    await streamPromise
   } catch (error) {
     ElMessage.error('分析失败，请稍后重试')
   } finally {
@@ -126,8 +145,8 @@ const handleAnalysis = async () => {
 }
 
 const aiAnalysisHtml = computed(() => {
-  if (analysisResult.value && analysisResult.value.aiAnalysis) {
-    return marked(analysisResult.value.aiAnalysis)
+  if (streamAiAnalysis.value) {
+    return marked(streamAiAnalysis.value)
   }
   return ''
 })

@@ -187,30 +187,56 @@ const prepareDistributionData = async () => {
     const res = await getDistribution({ dimension: selectedDimension.value })
     const option = {
       ...baseChartOption,
-      tooltip: { trigger: 'item' },
+      tooltip: {
+        trigger: 'item',
+        formatter: '{a} <br/>{b}: {c} ({d}%)',
+        backgroundColor: 'rgba(30, 41, 59, 0.9)',
+        borderColor: '#4ade80',
+        textStyle: {
+          color: '#e2e8f0',
+        },
+      },
       legend: {
         ...baseChartOption.legend,
         orient: 'vertical',
-        left: 'left',
+        right: '5%',
         top: 'center',
       },
       series: [
         {
-          name: '分布',
+          name: '需求分布',
           type: 'pie',
-          radius: ['40%', '70%'],
-          center: ['65%', '50%'],
-          avoidLabelOverlap: false,
+          radius: ['40%', '60%'],
+          center: ['40%', '50%'],
+          avoidLabelOverlap: true,
           itemStyle: {
             borderRadius: 10,
             borderColor: '#1e293b',
             borderWidth: 2,
           },
-          label: { show: false, position: 'center' },
-          emphasis: {
-            label: { show: true, fontSize: '20', fontWeight: 'bold', color: '#fff' },
+          label: {
+            show: true,
+            position: 'outer',
+            formatter: '{b}\n{d}%',
+            color: '#94a3b8',
+            fontSize: 12,
           },
-          labelLine: { show: false },
+          emphasis: {
+            label: {
+              show: true,
+              fontSize: '16',
+              fontWeight: 'bold',
+              color: '#fff',
+            },
+          },
+          labelLine: {
+            show: true,
+            length: 10,
+            length2: 15,
+            lineStyle: {
+              color: '#475569',
+            },
+          },
           data: res.data.data.map((item) => ({
             value: item.value,
             name: item.name,

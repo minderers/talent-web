@@ -6,6 +6,39 @@
       <!-- 用户头像和退出按钮将保留在 Home.vue 的主布局中 -->
     </header>
 
+    <!-- 筛选区域 -->
+    <div class="mb-8 p-6 bg-slate-800/50 rounded-xl border border-slate-700">
+      <div class="flex flex-col md:flex-row gap-6 items-center">
+        <el-input
+          v-model="filters.jobName"
+          placeholder="输入职位名称"
+          clearable
+          class="w-full md:w-auto flex-1"
+        />
+        <el-input
+          v-model="filters.region"
+          placeholder="输入地区"
+          clearable
+          class="w-full md:w-auto flex-1"
+        />
+        <el-select
+          v-model="filters.salaryRange"
+          placeholder="选择薪资范围"
+          clearable
+          class="w-full md:w-auto flex-1"
+        >
+          <el-option label="5k-10k" value="5-10" />
+          <el-option label="10k-15k" value="10-15" />
+          <el-option label="15k-20k" value="15-20" />
+          <el-option label="20k以上" value="20-" />
+        </el-select>
+        <div class="flex space-x-4">
+          <el-button @click="resetFilters">重置</el-button>
+          <el-button type="primary" @click="handleSearch">搜索</el-button>
+        </div>
+      </div>
+    </div>
+
     <!-- 加载状态 -->
     <div v-if="loading" class="text-center py-10">
       <p class="text-lg text-slate-400">正在加载职位数据...</p>
@@ -60,18 +93,41 @@ import { ElMessage } from 'element-plus'
 
 const jobList = ref([])
 const loading = ref(false)
+const total = ref(0)
+
 const pagination = reactive({
   page: 1,
   limit: 9,
 })
-const total = ref(0)
+
+const initialFilters = {
+  jobName: '',
+  region: '',
+  salaryRange: '',
+}
+
+const filters = reactive({ ...initialFilters })
 
 // 获取职位列表
 const fetchJobs = async () => {
   if (loading.value) return
   loading.value = true
   try {
-    const res = await getJobPage(pagination)
+    let minSalary, maxSalary
+    if (filters.salaryRange) {
+      const [min, max] = filters.salaryRange.split('-')
+      minSalary = min ? Number(min) : undefined
+      maxSalary = max ? Number(max) : undefined
+    }
+
+    const params = {
+      ...pagination,
+      jobName: filters.jobName || undefined,
+      region: filters.region || undefined,
+      minSalary,
+      maxSalary,
+    }
+    const res = await getJobPage(params)
     jobList.value = res.data.list
     total.value = res.data.total
   } catch (error) {
@@ -79,6 +135,18 @@ const fetchJobs = async () => {
   } finally {
     loading.value = false
   }
+}
+
+// 处理搜索
+const handleSearch = () => {
+  pagination.page = 1 // 搜索时回到第一页
+  fetchJobs()
+}
+
+// 重置筛选
+const resetFilters = () => {
+  Object.assign(filters, initialFilters)
+  handleSearch()
 }
 
 // 处理分页变化

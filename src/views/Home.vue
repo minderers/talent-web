@@ -353,41 +353,38 @@ const beforeAvatarUpload = (rawFile) => {
 // 更新用户信息
 const handleProfileUpdate = async () => {
   try {
-    // 准备要提交的数据
     const dataToUpdate = {
       pkId: profileForm.pkId,
       nickname: profileForm.nickname,
       avatar: profileForm.avatar,
-      // 如果“新密码”输入框有值，则使用新密码；否则，使用获取到的原始密码
       password: profileForm.password || profileForm.originalPassword,
     }
 
-    // 1. 调用更新接口
     await updateUserInfo(dataToUpdate)
-    ElMessage.success('用户信息更新成功！')
 
-    // 2. 手动更新 store 中对应的字段，而不是整个替换
-    // 这样可以确保 accessToken 等其他字段不会丢失
-    userStore.userInfo.nickname = profileForm.nickname
-    userStore.userInfo.avatar = profileForm.avatar
-    // 如果用户输入了新密码，后端返回的 password 可能是加密后的，这里也同步一下
-    // 假设后端在 data 中返回了更新后的 password
+    // 如果修改了密码，则显示成功消息并立即执行登出
     if (profileForm.password) {
-      const res = await userStore.getLoginUserInfo()
-      profileForm.originalPassword = res.data.password
+      ElMessage.success('密码已修改，将立即退出登录')
+      isProfileDialogVisible.value = false
+      handleLogout() // 直接调用登出，清除token并跳转
+      return // 提前结束函数
     }
 
+    // 如果没修改密码，则正常更新 store 并关闭弹窗
+    ElMessage.success('用户信息更新成功！')
+    userStore.userInfo.nickname = profileForm.nickname
+    userStore.userInfo.avatar = profileForm.avatar
     isProfileDialogVisible.value = false
   } catch (error) {
-    // 如果更新或刷新失败，都会进入这里
+    // 此处的 catch 现在只应捕获真正的更新失败
     ElMessage.error('用户信息更新失败')
   }
 }
 
 // Tab 控制
-const activeTab = ref('industryDatabase')
+const activeTab = ref('jobList')
 const menuItems = ref([
-  { id: 'industryDatabase', name: '产业数据库', component: IndustryDatabase },
+  // { id: 'industryDatabase', name: '产业数据库', component: IndustryDatabase },
   { id: 'jobList', name: '岗位列表', component: JobList },
   { id: 'talentDemandForecast', name: '人才需求分析', component: TalentDemandForecast },
   { id: 'dataAnalysis', name: '数据采集与分析', component: DataAnalysis },
@@ -403,8 +400,18 @@ const currentComponent = computed(() => {
 
 // 退出登录
 const handleLogout = async () => {
-  await logout()
-  router.push('/login')
+  try {
+    // 尝试调用后端退出登录接口
+    await logout()
+  } catch (error) {
+    // 即便后端接口失败，也继续执行登出流程
+    console.error('调用退出登录接口失败:', error)
+  } finally {
+    // 无论后端退出成功与否，都清空前端状态并跳转
+    userStore.clearUserInfo()
+    userStore.clearToken()
+    router.push('/login')
+  }
 }
 </script>
 
