@@ -7,7 +7,7 @@
       </div>
       <nav>
         <ul>
-          <li v-for="item in menuItems" :key="item.id" class="mb-2">
+          <li v-for="item in filteredMenuItems" :key="item.id" class="mb-2">
             <button
               @click="activeTab = item.id"
               :class="[
@@ -205,7 +205,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed } from 'vue'
+import { ref, reactive, computed, watch } from 'vue' // Add watch
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { logout, updateUserInfo, updateUserPhone, sendSmsCode } from '@/api/user'
@@ -382,7 +382,7 @@ const handleProfileUpdate = async () => {
 }
 
 // Tab 控制
-const activeTab = ref('jobList')
+const activeTab = ref('jobList') // Default to 'jobList'
 const menuItems = ref([
   // { id: 'industryDatabase', name: '产业数据库', component: IndustryDatabase },
   { id: 'jobList', name: '岗位列表', component: JobList },
@@ -393,10 +393,44 @@ const menuItems = ref([
   { id: 'aiQa', name: 'AI智能问答', component: AiQa },
 ])
 
+const filteredMenuItems = computed(() => {
+  const role = userStore.userInfo?.role
+  if (role === undefined || role === null) {
+    return []
+  }
+  return menuItems.value.filter((item) => {
+    if (item.id === 'majorSetupSuggestion') {
+      return role === 0 || role === 1 // Only show for role 0 (专业负责人) or 1 (教务管理员)
+    }
+    return true // Show other items for all roles by default
+  })
+})
+
 const currentComponent = computed(() => {
-  const activeItem = menuItems.value.find((item) => item.id === activeTab.value)
+  const activeItem = filteredMenuItems.value.find((item) => item.id === activeTab.value)
   return activeItem ? activeItem.component : null
 })
+
+// Watch for role changes and adjust activeTab if necessary
+watch(
+  () => userStore.userInfo?.role,
+  (newRole) => {
+    // If the current active tab is 'majorSetupSuggestion' and the new role doesn't have access
+    if (activeTab.value === 'majorSetupSuggestion' && !(newRole === 0 || newRole === 1)) {
+      // Find the first available tab for the new role
+      const firstAvailableTab =
+        filteredMenuItems.value.length > 0 ? filteredMenuItems.value[0].id : ''
+      activeTab.value = firstAvailableTab
+    } else if (
+      filteredMenuItems.value.length > 0 &&
+      !filteredMenuItems.value.some((item) => item.id === activeTab.value)
+    ) {
+      // If current active tab is not in filteredMenuItems (e.g., after initial load or role change)
+      activeTab.value = filteredMenuItems.value[0].id
+    }
+  },
+  { immediate: true },
+) // Run immediately on component mount to set initial activeTab based on role
 
 // 退出登录
 const handleLogout = async () => {
