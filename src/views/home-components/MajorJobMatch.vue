@@ -21,7 +21,6 @@
         <el-button type="primary" :loading="loading.match" class="run-btn" @click="runMatch">生成缺口分析</el-button>
       </div>
     </section>
-
     <section class="top-grid mt12">
       <div class="score-card panel">
         <div class="panel-title">综合匹配度评分</div>
@@ -61,32 +60,38 @@
 
     <section class="panel mt12">
       <div class="panel-title">课程-技能映射矩阵</div>
-      <el-table :data="matrixRows" class="matrix-table" stripe empty-text="暂无课程映射数据">
-        <el-table-column label="专业课程" min-width="220">
-          <template #default="x">
-            <div class="course-name">{{ x.row.courseName || '--' }}</div>
-            <div class="course-code">{{ x.row.courseCode || '' }}</div>
-          </template>
-        </el-table-column>
-        <el-table-column label="覆盖技能" min-width="260">
-          <template #default="x">
-            <div class="tag-row">
-              <el-tag v-for="skill in x.row.coveredSkills" :key="`${x.row.courseCode}-${skill}`" size="small" effect="plain">{{ skill }}</el-tag>
-            </div>
-          </template>
-        </el-table-column>
-        <el-table-column label="产业需求强度" width="150">
-          <template #default="x">
-            <el-tag :type="demandTagType(x.row.industryDemandLevel)" effect="dark">{{ x.row.industryDemandLevel || '待提升' }}</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="匹配度" width="110">
-          <template #default="x">
-            <span class="match-degree">{{ x.row.matchDegree }}%</span>
-          </template>
-        </el-table-column>
-        <el-table-column prop="actionSuggestion" label="操作建议" min-width="180" />
-      </el-table>
+
+      <div v-if="!matrixRows.length" class="empty-text">暂无课程映射数据</div>
+      <div v-else class="matrix-custom">
+        <div class="matrix-head">
+          <div>专业课程</div>
+          <div>覆盖技能</div>
+          <div>产业需求强度</div>
+          <div>匹配度</div>
+          <div>操作建议</div>
+        </div>
+
+        <div v-for="row in matrixRows" :key="row.id" class="matrix-row">
+          <div>
+            <div class="course-name">{{ row.courseName || '--' }}</div>
+            <div class="course-code">{{ row.courseCode || '' }}</div>
+          </div>
+
+          <div class="tag-row">
+            <span v-for="skill in row.coveredSkills" :key="`${row.id}-${skill}`" class="skill-chip">{{ skill }}</span>
+          </div>
+
+          <div>
+            <span class="demand-badge" :class="demandClass(row.industryDemandLevel)">{{ row.industryDemandLevel || '待提升' }}</span>
+          </div>
+
+          <div>
+            <span class="match-degree">{{ row.matchDegree }}%</span>
+          </div>
+
+          <div class="suggestion-text">{{ row.actionSuggestion || '--' }}</div>
+        </div>
+      </div>
     </section>
   </div>
 </template>
@@ -181,10 +186,10 @@ const matrixRows = computed(() => {
   }))
 })
 
-const demandTagType = (level) => {
-  if (level === '高' || level === '极高') return 'danger'
-  if (level === '中') return 'warning'
-  return 'info'
+const demandClass = (level) => {
+  if (level === '高' || level === '极高') return 'is-high'
+  if (level === '中') return 'is-mid'
+  return 'is-low'
 }
 
 const analysisPayload = () => ({ majorId: 1, jobType: analysis.jobType, education: analysis.education, topN: analysis.topN })
@@ -244,32 +249,23 @@ async function runMatch() {
   max-height:calc(1.75em * 3);
   overflow:hidden;
 }
-.matrix-table :deep(.el-table){
-  --el-table-bg-color: rgba(10,18,34,.72);
-  --el-table-tr-bg-color: rgba(15,23,42,.62);
-  --el-table-row-hover-bg-color: rgba(59,130,246,.16);
-  --el-table-current-row-bg-color: rgba(59,130,246,.18);
-  --el-table-header-bg-color: rgba(15,23,42,.88);
-  --el-table-text-color: #cbd5e1;
-  --el-table-header-text-color: #86efac;
-  --el-table-border-color: rgba(148,163,184,.3);
-  --el-fill-color-lighter: rgba(30,41,59,.46);
-  background: rgba(10,18,34,.68) !important;
-  border: 1px solid rgba(74,222,128,.14);
-  border-radius: 14px;
-  overflow: hidden;
-}
-.matrix-table :deep(.el-table::before),.matrix-table :deep(.el-table__inner-wrapper::before){background:rgba(148,163,184,.3)!important}
-.matrix-table :deep(.el-table__inner-wrapper),.matrix-table :deep(.el-table__body-wrapper),.matrix-table :deep(.el-table__header-wrapper),.matrix-table :deep(.el-scrollbar__view){background:rgba(10,18,34,.68)!important}
-.matrix-table :deep(.el-table td.el-table__cell){background:rgba(15,23,42,.58)!important;color:#cbd5e1;border-bottom-color:rgba(148,163,184,.24)!important}
-.matrix-table :deep(.el-table th.el-table__cell){background:rgba(15,23,42,.9)!important;color:#86efac!important;border-bottom-color:rgba(148,163,184,.34)!important}
-.matrix-table :deep(.el-table--striped .el-table__body tr.el-table__row--striped td.el-table__cell){background:rgba(30,41,59,.5)!important}
-.matrix-table :deep(.el-table__body tr:hover>td.el-table__cell){background:rgba(59,130,246,.16)!important}
+.matrix-custom{border:1px solid rgba(74,222,128,.18);border-radius:14px;overflow:hidden;background:rgba(10,18,34,.88)!important}
+.matrix-head,.matrix-row{display:grid;grid-template-columns:1.2fr 2fr .9fr .7fr 1fr;gap:18px;align-items:center}
+.matrix-head{padding:14px 16px;background:rgba(15,23,42,.96)!important;color:#bbf7d0;font-weight:700;border-bottom:1px solid rgba(74,222,128,.2)}
+.matrix-row{padding:14px 16px;color:#86efac;border-bottom:1px solid rgba(74,222,128,.14);background:rgba(15,23,42,.82)!important}
+.matrix-row:nth-child(even){background:rgba(30,41,59,.72)!important}
+.matrix-row:hover{background:rgba(34,197,94,.1)!important}
+.skill-chip{display:inline-flex;align-items:center;padding:2px 8px;border-radius:9999px;border:1px solid rgba(74,222,128,.32);background:rgba(34,197,94,.08);color:#86efac;font-size:12px}
+.demand-badge{display:inline-flex;align-items:center;justify-content:center;min-width:56px;padding:2px 10px;border-radius:9999px;font-size:12px;border:1px solid transparent}
+.demand-badge.is-high{color:#fca5a5;border-color:rgba(248,113,113,.45);background:rgba(239,68,68,.15)}
+.demand-badge.is-mid{color:#fcd34d;border-color:rgba(251,191,36,.45);background:rgba(245,158,11,.15)}
+.demand-badge.is-low{color:#cbd5e1;border-color:rgba(148,163,184,.4);background:rgba(71,85,105,.25)}
+.suggestion-text{color:#a7f3d0}
 .tag-row{display:flex;flex-wrap:wrap;gap:8px}
-.course-name{font-weight:700;color:#93c5fd}
-.course-code{color:#94a3b8;font-size:12px;margin-top:2px}
-.match-degree{display:inline-block;min-width:54px;text-align:center;padding:2px 10px;border-radius:9999px;border:1px solid rgba(34,197,94,.8);color:#86efac}
+.course-name{font-weight:700;color:#bbf7d0}
+.course-code{color:#86efac;font-size:12px;margin-top:2px}
+.match-degree{display:inline-flex;align-items:center;justify-content:center;min-width:54px;padding:2px 10px;border-radius:9999px;border:1px solid rgba(74,222,128,.75);color:#86efac}
 .empty-text{padding:10px 0;color:#94a3b8}
-@media (max-width:1200px){.top-grid{grid-template-columns:1fr}.form-inline{grid-template-columns:1fr 1fr}.toolbar-line{flex-direction:column;align-items:stretch}.run-btn{width:100%}}
+@media (max-width:1200px){.top-grid{grid-template-columns:1fr}.form-inline{grid-template-columns:1fr 1fr}.toolbar-line{flex-direction:column;align-items:stretch}.run-btn{width:100%}.matrix-head,.matrix-row{grid-template-columns:1fr}}
 @media (max-width:768px){.form-inline{grid-template-columns:1fr}}
 </style>

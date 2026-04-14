@@ -54,6 +54,42 @@ const emitSseEvent = (eventString, onProgress) => {
   if (content && onProgress) onProgress(content)
 }
 
+const parseSseEventBlock = (eventString) => {
+  const lines = String(eventString).split(/\r?\n/)
+  let event = 'message'
+  const dataParts = []
+
+  for (const line of lines) {
+    const trimmedLine = line.trimStart()
+    if (trimmedLine.startsWith('event:')) {
+      event = trimmedLine.substring(6).trim() || 'message'
+    } else if (trimmedLine.startsWith('data:')) {
+      dataParts.push(trimmedLine.substring(5))
+    }
+  }
+
+  const rawPayload = dataParts.length ? dataParts.join('\n') : ''
+  const text = String(rawPayload || '').trim()
+  let data = text
+
+  if (text) {
+    try {
+      data = JSON.parse(text)
+    } catch {
+      data = text
+    }
+  }
+
+  return { event, data, raw: text, content: parseSsePayload(text) }
+}
+
+const emitSseEventWithMeta = (eventString, onEvent, onProgress) => {
+  if (!eventString) return
+  const payload = parseSseEventBlock(eventString)
+  if (onEvent) onEvent(payload)
+  if (onProgress && payload.content) onProgress(payload.content)
+}
+
 const parseSseStream = async (response, onProgress) => {
   const reader = response.body.getReader()
   const decoder = new TextDecoder('utf-8')
@@ -96,6 +132,46 @@ const postSse = async (path, data, onProgress) => {
   }
 
   await parseSseStream(response, onProgress)
+}
+
+const postSseWithEvents = async (path, data, { onEvent, onProgress }) => {
+  const response = await fetch(`${baseURL}${path}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: getAuthToken(),
+    },
+    body: JSON.stringify(data),
+  })
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error('登录失效，请重新登录')
+    }
+    throw new Error(`HTTP error! status: ${response.status}`)
+  }
+
+  const reader = response.body.getReader()
+  const decoder = new TextDecoder('utf-8')
+  let buffer = ''
+
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+
+    buffer += decoder.decode(value, { stream: true })
+    const eventStrings = buffer.split(/\r?\n\r?\n/)
+    buffer = eventStrings.pop() || ''
+
+    for (const eventString of eventStrings) {
+      emitSseEventWithMeta(eventString, onEvent, onProgress)
+    }
+  }
+
+  const tail = buffer + decoder.decode()
+  if (tail.trim()) {
+    emitSseEventWithMeta(tail, onEvent, onProgress)
+  }
 }
 
 const buildDownloadUrl = (path, params = {}) => {
@@ -166,6 +242,10 @@ export const interpretPlanningGapStream = ({ data, onProgress }) => {
   return postSse('/planning/gap/interpret', data, onProgress)
 }
 
+export const interpretPlanningGapStreamWithEvents = ({ data, onEvent, onProgress }) => {
+  return postSseWithEvents('/planning/gap/interpret', data, { onEvent, onProgress })
+}
+
 export const generatePlanningGuidance = (data) => {
   return http.post('/planning/guidance/generate', data)
 }
@@ -174,8 +254,16 @@ export const generatePlanningGuidanceStream = ({ data, onProgress }) => {
   return postSse('/planning/guidance/generate', data, onProgress)
 }
 
+export const generatePlanningGuidanceStreamWithEvents = ({ data, onEvent, onProgress }) => {
+  return postSseWithEvents('/planning/guidance/generate', data, { onEvent, onProgress })
+}
+
 export const listPlanningGuidance = (params) => {
   return http.get('/planning/guidance/list', { params })
+}
+
+export const savePlanningGuidanceFromStream = (data) => {
+  return http.post('/planning/guidance/save-from-stream', data)
 }
 
 export const submitPlanningGuidance = (data) => {
